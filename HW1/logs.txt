@@ -1,0 +1,12 @@
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ ./deploy.sh
+# Removed logs
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ curl -X POST -w "\n" "http://$PUBLIC_IP:5000/entry?plate=123-123-124&parkingLot=1"
+{"ticket_id": "bac9831c-bbf0-11ec-88d9-f77ad74b718f"}
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ curl -X POST -w "\n" "http://$PUBLIC_IP:5000/exit?ticketId=bac9831c-bbf0-11ec-88d9-f77ad74b718f"
+{"plate": "123-123-124", "total_parked_time_minutes": 0, "parking_lot": "1", "charge": 0.0}
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ curl -X POST -w "\n" "http://$PUBLIC_IP:5000/entry?plate=123-123-125&parkingLot=1"
+{"ticket_id": "d187a7d2-bbf0-11ec-88d9-f77ad74b718f"}
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ echo "waiting for 20 minutes"
+waiting for 20 minutes
+salasin@salasin-gliux:~/PycharmProjects/CloudComputing/HW1$ curl -X POST -w "\n" "http://$PUBLIC_IP:5000/exit?ticketId=d187a7d2-bbf0-11ec-88d9-f77ad74b718f"
+{"plate": "123-123-125", "total_parked_time_minutes": 20, "parking_lot": "1", "charge": 2.5}
