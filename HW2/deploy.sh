@@ -6,6 +6,8 @@ UBUNTU_20_04_AMI="ami-042e8287309f5df03"
 REDIS_SERVING_PORT=6379
 ENDPOINT_SERVING_PORT=5000
 MY_IP=$(curl ipinfo.io/ip)
+ACCESS_KEY_ID=''
+SECRET_ACCESS_KEY=''
 
 echo "create key pair $KEY_PEM to connect to instances and save locally"
 aws ec2 create-key-pair --key-name $KEY_NAME \
@@ -53,6 +55,7 @@ REDIS_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $REDIS_SERVER_INSTA
 
 echo "Redis server $REDIS_SERVER_INSTANCE_ID @ $REDIS_SERVER_IP"
 
+# TODO: this doesn't work when it's running from a script, only when the commands are run manually
 echo "setup Redis server..."
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$REDIS_SERVER_IP <<EOF
     sudo apt-get update
@@ -113,7 +116,7 @@ ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@
     pip3 install redis
     pip3 install apscheduler
     pip3 install boto3
-    nohup python3 endpoint.py $REDIS_SERVER_IP primary &>/dev/null &
+    nohup python3 endpoint.py $REDIS_SERVER_IP primary $ACCESS_KEY_ID $SECRET_ACCESS_KEY &>/dev/null &
     exit
 EOF
 
@@ -145,3 +148,27 @@ ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@
     python3 endpoint.py $REDIS_SERVER_IP secondary
     exit
 EOF
+
+########################################################################################################################
+#
+# SETUP OF WORKERS
+#
+########################################################################################################################
+
+WORKER_SERVER_SEC_GRP="worker-server-sg-`date +'%N'`"
+
+echo "setup security group for worker server..."
+aws ec2 create-security-group   \
+    --group-name WORKER_SERVER_SEC_GRP      \
+    --description "Worker server security group"
+
+echo 'REDIS_SERVER_IP='$REDIS_SERVER_IP > modified_install_worker.sh
+cat install_worker.sh >> modified_install_worker.sh
+
+aws autoscaling create-launch-configuration \
+    --launch-configuration-name worker-lc \
+    --image-id $UBUNTU_20_04_AMI \
+    --instance-type t3.micro \
+    --key-name $KEY_NAME \
+    --security-groups $WORKER_SERVER_SEC_GRP \
+    --user-data file://install_worker.sh

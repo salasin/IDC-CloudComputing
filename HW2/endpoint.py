@@ -37,15 +37,24 @@ def execute_pull_completed():
     top_arg = request.args.get('top')
     top = int(re.findall('\d+', top_arg)[0])
     redis_conn = get_redis_conn(app.config.get('redis_server_ip'))
-    completed_work = redis_conn.lpop(COMPLETED_WORK_QUEUE, top)
+    # TODO: change this to be atomic
+    completed_work = []
+    for i in range(top):
+        item = redis_conn.lpop(COMPLETED_WORK_QUEUE)
+        if item is not None:
+            completed_work.append(json.loads(item))
+    if len(completed_work) == 0:
+        return Response(mimetype='application/json',
+                        response='Work completed queue is empty.',
+                        status=200)
     return Response(mimetype='application/json',
                     response=json.dumps({'completed_work': completed_work}),
                     status=200)
 
 
-def report_work_queue_len(redis_server_ip):
+def report_work_queue_len(redis_server_ip, aws_access_key_id, aws_secret_access_key):
     redis_conn = get_redis_conn(redis_server_ip)
-    cloud_watch = boto3.client('cloudwatch', region_name='us-east-1')
+    cloud_watch = boto3.client('cloudwatch', region_name='us-east-1', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
     cloud_watch.put_metric_data(
         MetricData=[
             {
@@ -61,9 +70,11 @@ def report_work_queue_len(redis_server_ip):
 if __name__ == '__main__':
     redis_server_ip = sys.argv[1]
     is_primary = sys.argv[2] == 'primary'
+    aws_access_key_id = sys.argv[3]
+    aws_secret_access_key = sys.argv[4]
     if is_primary:
         scheduler = BackgroundScheduler()
-        scheduler.add_job(func=report_work_queue_len, args=[redis_server_ip], trigger="interval", seconds=60)
+        scheduler.add_job(func=report_work_queue_len, args=[redis_server_ip, aws_access_key_id, aws_secret_access_key], trigger="interval", seconds=60)
         scheduler.start()
     app.config['redis_server_ip'] = redis_server_ip
     app.run(host="0.0.0.0")
