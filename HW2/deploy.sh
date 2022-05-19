@@ -6,8 +6,9 @@ UBUNTU_20_04_AMI="ami-042e8287309f5df03"
 REDIS_SERVING_PORT=6379
 ENDPOINT_SERVING_PORT=5000
 MY_IP=$(curl ipinfo.io/ip)
-ACCESS_KEY_ID=''
-SECRET_ACCESS_KEY=''
+ACCESS_KEY_ID=""
+SECRET_ACCESS_KEY=""
+AVAILABILITY_ZONE="us-east-1a"
 
 echo "create key pair $KEY_PEM to connect to instances and save locally"
 aws ec2 create-key-pair --key-name $KEY_NAME \
@@ -159,11 +160,23 @@ WORKER_SERVER_SEC_GRP="worker-server-sg-`date +'%N'`"
 
 echo "setup security group for worker server..."
 aws ec2 create-security-group   \
-    --group-name WORKER_SERVER_SEC_GRP      \
+    --group-name $WORKER_SERVER_SEC_GRP      \
     --description "Worker server security group"
 
-echo 'REDIS_SERVER_IP='$REDIS_SERVER_IP > modified_install_worker.sh
-cat install_worker.sh >> modified_install_worker.sh
+echo "setup rule allowing SSH access to worker servers"
+aws ec2 authorize-security-group-ingress        \
+    --group-name $WORKER_SERVER_SEC_GRP --port 22 --protocol tcp \
+    --cidr $MY_IP/32
+
+echo '#!/bin/bash' > userdata
+echo 'cd /root' >> userdata
+echo 'REDIS_SERVER_IP='$REDIS_SERVER_IP >> userdata
+echo 'sudo apt-get update' >> userdata
+echo 'sudo apt-get install -y python3-pip' >> userdata
+echo 'sudo apt-get install -y git-all' >> userdata
+echo 'pip3 install redis' >> userdata
+echo 'git clone "https://github.com/salasin/IDC-CloudComputing"' >> userdata
+echo 'python3 IDC-CloudComputing/HW2/worker.py $REDIS_SERVER_IP' >> userdata
 
 aws autoscaling create-launch-configuration \
     --launch-configuration-name worker-lc \
@@ -171,4 +184,39 @@ aws autoscaling create-launch-configuration \
     --instance-type t3.micro \
     --key-name $KEY_NAME \
     --security-groups $WORKER_SERVER_SEC_GRP \
-    --user-data file://install_worker.sh
+    --user-data file://userdata
+
+rm userdata
+
+#VPC=$(aws ec2 describe-security-groups --group-names $WORKER_SERVER_SEC_GRP |
+#    jq -r '.SecurityGroups[0].VpcId'
+#)
+
+# TODO: determine $AVAILABILITY_ZONE dynamically
+
+aws autoscaling create-auto-scaling-group --auto-scaling-group-name workers-asg \
+  --launch-configuration-name worker-lc \
+  --availability-zones $AVAILABILITY_ZONE \
+  --max-size 1 --min-size 0
+
+START_POLICY_ARN=$(aws autoscaling put-scaling-policy --policy-name start-worker-policy \
+  --auto-scaling-group-name workers-asg --scaling-adjustment 1 \
+  --adjustment-type ChangeInCapacity | jq -r '.PolicyARN'
+)
+
+STOP_POLICY_ARN=$(aws autoscaling put-scaling-policy --policy-name stop-worker-policy \
+  --auto-scaling-group-name workers-asg --scaling-adjustment -1 \
+  --adjustment-type ChangeInCapacity --cooldown 300 | jq -r '.PolicyARN'
+)
+
+aws cloudwatch put-metric-alarm --alarm-name start-worker-alarm \
+  --metric-name work_queue_length --namespace CloudComputingHW2 --statistic Average \
+  --period 60 --evaluation-periods 5 --threshold 0.001 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --alarm-actions $START_POLICY_ARN
+
+aws cloudwatch put-metric-alarm --alarm-name stop-worker-alarm \
+  --metric-name work_queue_length --namespace CloudComputingHW2 --statistic Average \
+  --period 180 --evaluation-periods 15 --threshold 0.001 \
+  --comparison-operator LessThanThreshold \
+  --alarm-actions $STOP_POLICY_ARN
