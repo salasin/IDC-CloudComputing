@@ -56,6 +56,9 @@ REDIS_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $REDIS_SERVER_INSTA
 
 echo "Redis server $REDIS_SERVER_INSTANCE_ID @ $REDIS_SERVER_IP"
 
+# It is obviously wrong to init redis in this manner and I have witnessed myself the following issue:
+# https://stackoverflow.com/questions/50264694/my-redis-auto-generated-keys
+# However, this is good enough for the purpose of creating a demo for HW
 # TODO: this doesn't work when it's running from a script, only when the commands are run manually
 echo "setup Redis server..."
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$REDIS_SERVER_IP <<EOF
