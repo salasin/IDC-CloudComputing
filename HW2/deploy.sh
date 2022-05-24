@@ -3,8 +3,6 @@
 KEY_NAME="key-`date +'%N'`"
 KEY_PEM="$KEY_NAME.pem"
 UBUNTU_20_04_AMI="ami-042e8287309f5df03"
-REDIS_SERVING_PORT=6379
-ENDPOINT_SERVING_PORT=5000
 MY_IP=$(curl ipinfo.io/ip)
 ACCESS_KEY_ID=""
 SECRET_ACCESS_KEY=""
@@ -34,9 +32,9 @@ aws ec2 authorize-security-group-ingress        \
     --group-name $REDIS_SEC_GRP --port 22 --protocol tcp \
     --cidr $MY_IP/32
 
-echo "setup rule allowing HTTP (port $REDIS_SERVING_PORT) access to Redis server..."
+echo "setup rule allowing HTTP access to Redis server..."
 aws ec2 authorize-security-group-ingress        \
-    --group-name $REDIS_SEC_GRP --port $REDIS_SERVING_PORT --protocol tcp \
+    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
     --cidr 0.0.0.0/0
 
 echo "creating Redis server..."
@@ -65,7 +63,7 @@ ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@
     sudo apt-get update
     yes Y | sudo apt-get install redis-server
     sudo service redis-server stop
-    redis-server --port $REDIS_SERVING_PORT --daemonize yes --protected-mode no
+    redis-server --port 6379 --daemonize yes --protected-mode no
     exit
 EOF
 
@@ -87,9 +85,9 @@ aws ec2 authorize-security-group-ingress        \
     --group-name $ENDPOINT_SERVER_SEC_GRP --port 22 --protocol tcp \
     --cidr $MY_IP/32
 
-echo "setup rule allowing HTTP (port $ENDPOINT_SERVING_PORT) access to endpoint server"
+echo "setup rule allowing HTTP access to endpoint server"
 aws ec2 authorize-security-group-ingress        \
-    --group-name $ENDPOINT_SERVER_SEC_GRP --port $ENDPOINT_SERVING_PORT --protocol tcp \
+    --group-name $ENDPOINT_SERVER_SEC_GRP --port 5000 --protocol tcp \
     --cidr 0.0.0.0/0
 
 echo "creating primary endpoint server..."

@@ -26,10 +26,8 @@ while value:
         work_id = parsed_work['work_id']
         iterations = parsed_work['iterations']
         payload = parsed_work['payload']
-        # TODO: remove the encoding when the data is actually binary
         processed_payload = process(bytes(payload, 'utf-8'), iterations)
         print(processed_payload)
-        # TODO: find another way to pass the bytes back w/o serializing
         redis_conn.rpush(COMPLETED_WORK_QUEUE, json.dumps({'work_id': work_id, 'processed_payload': str(processed_payload)}))
 
 

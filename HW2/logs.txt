@@ -1,10 +1,8 @@
+Useful commands:
+curl -X PUT -w "\n" -F "file=@file" "http://localhost:5000/enqueue?iterations=num-40"
+curl -X POST -w "\n" "http://localhost:5000/pullCompleted?top=num-1"
 
-curl -X PUT -w "\n" "http://localhost:5000/enqueue?iterations=num-12"
-
-curl -X POST -w "\n" "http://localhost:5000/pullcompleted?top=num-1"
-
-https://medium.com/geekculture/scaling-ec2-instances-subject-to-job-queue-size-edb0dbc1e550
-
-https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-simple-step.html#policy-creating-aws-cli
-
-https://docs.aws.amazon.com/cli/latest/reference/autoscaling/create-launch-configuration.html
+Articles:
+1. https://medium.com/geekculture/scaling-ec2-instances-subject-to-job-queue-size-edb0dbc1e550
+2. https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-simple-step.html#policy-creating-aws-cli
+3. https://docs.aws.amazon.com/cli/latest/reference/autoscaling/create-launch-configuration.html

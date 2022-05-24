@@ -23,16 +23,16 @@ def execute_enqueue():
     work_id = str(uuid.uuid1())
     iterations_arg = request.args.get('iterations')
     iterations = int(re.findall('\d+', iterations_arg)[0])
-    # TODO: generate payload from request, piazza post: https://piazza.com/class/l051k4nh7g44pf?cid=31
-    payload = 'payload'
+    file = request.files['file']
+    file_content = file.read()
     redis_conn = get_redis_conn(app.config.get('redis_server_ip'))
-    redis_conn.rpush(WORK_QUEUE, json.dumps({'work_id': work_id, 'iterations': iterations, 'payload': payload}))
+    redis_conn.rpush(WORK_QUEUE, json.dumps({'work_id': work_id, 'iterations': iterations, 'payload': str(file_content)}))
     return Response(mimetype='application/json',
                     response=json.dumps({'work_id': work_id}),
                     status=200)
 
 
-@app.route('/pullcompleted', methods=['POST'])
+@app.route('/pullCompleted', methods=['POST'])
 def execute_pull_completed():
     top_arg = request.args.get('top')
     top = int(re.findall('\d+', top_arg)[0])
