@@ -32,11 +32,6 @@ aws ec2 authorize-security-group-ingress        \
     --group-name $REDIS_SEC_GRP --port 22 --protocol tcp \
     --cidr $MY_IP/32
 
-echo "setup rule allowing HTTP access to Redis server..."
-aws ec2 authorize-security-group-ingress        \
-    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
-    --cidr 0.0.0.0/0
-
 echo "creating Redis server..."
 RUN_REDIS_SERVER=$(aws ec2 run-instances   \
     --image-id $UBUNTU_20_04_AMI        \
@@ -84,7 +79,7 @@ aws ec2 authorize-security-group-ingress        \
 echo "setup rule allowing HTTP access to endpoint server"
 aws ec2 authorize-security-group-ingress        \
     --group-name $ENDPOINT_SERVER_SEC_GRP --port 5000 --protocol tcp \
-    --cidr 0.0.0.0/0
+    --cidr $MY_IP/32
 
 echo "creating primary endpoint server..."
 RUN_PRIMARY_ENDPOINT_SERVER=$(aws ec2 run-instances   \
@@ -100,6 +95,11 @@ aws ec2 wait instance-running --instance-ids $PRIMARY_ENDPOINT_SERVER_INSTANCE_I
 PRIMARY_ENDPOINT_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $PRIMARY_ENDPOINT_SERVER_INSTANCE_ID |
     jq -r '.Reservations[0].Instances[0].PublicIpAddress'
 )
+
+echo "setup rule allowing HTTP access to Redis server from primary endpoint server..."
+aws ec2 authorize-security-group-ingress        \
+    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
+    --cidr $PRIMARY_ENDPOINT_SERVER_IP/32
 
 echo "primary endpoint server $PRIMARY_ENDPOINT_SERVER_INSTANCE_ID @ $PRIMARY_ENDPOINT_SERVER_IP"
 
@@ -133,6 +133,11 @@ aws ec2 wait instance-running --instance-ids $SECONDARY_ENDPOINT_SERVER_INSTANCE
 SECONDARY_ENDPOINT_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $SECONDARY_ENDPOINT_SERVER_INSTANCE_ID |
     jq -r '.Reservations[0].Instances[0].PublicIpAddress'
 )
+
+echo "setup rule allowing HTTP access to Redis server from secondary endpoint server..."
+aws ec2 authorize-security-group-ingress        \
+    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
+    --cidr $SECONDARY_ENDPOINT_SERVER_IP/32
 
 echo "secondary endpoint server $SECONDARY_ENDPOINT_SERVER_INSTANCE_ID @ $SECONDARY_ENDPOINT_SERVER_IP"
 
