@@ -1,12 +1,12 @@
 # Branched from https://gist.github.com/ayende/db14de14bcd4e0603eb30f26914d9a2b
 
+AVAILABILITY_ZONE="us-east-1a"
 KEY_NAME="key-`date +'%N'`"
 KEY_PEM="$KEY_NAME.pem"
 UBUNTU_20_04_AMI="ami-042e8287309f5df03"
 MY_IP=$(curl ipinfo.io/ip)
-ACCESS_KEY_ID=""
-SECRET_ACCESS_KEY=""
-AVAILABILITY_ZONE="us-east-1a"
+ACCESS_KEY_ID=
+SECRET_ACCESS_KEY=
 
 echo "create key pair $KEY_PEM to connect to instances and save locally"
 aws ec2 create-key-pair --key-name $KEY_NAME \
@@ -54,14 +54,10 @@ REDIS_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $REDIS_SERVER_INSTA
 
 echo "Redis server $REDIS_SERVER_INSTANCE_ID @ $REDIS_SERVER_IP"
 
-# It is obviously wrong to init redis in this manner and I have witnessed myself the following issue:
-# https://stackoverflow.com/questions/50264694/my-redis-auto-generated-keys
-# However, this is good enough for the purpose of creating a demo for HW
-# TODO: this doesn't work when it's running from a script, only when the commands are run manually
 echo "setup Redis server..."
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$REDIS_SERVER_IP <<EOF
     sudo apt-get update
-    yes Y | sudo apt-get install redis-server
+    sudo apt-get install redis-server -y
     sudo service redis-server stop
     redis-server --port 6379 --daemonize yes --protected-mode no
     exit
@@ -114,7 +110,7 @@ echo "setup primary endpoint server..."
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$PRIMARY_ENDPOINT_SERVER_IP <<EOF
     sudo apt-get update
     sudo apt-get install python3-flask -y
-    yes Y | sudo apt-get install python3-pip
+    sudo apt-get install python3-pip -y
     pip3 install redis
     pip3 install apscheduler
     pip3 install boto3
@@ -145,9 +141,13 @@ scp -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=60" endpoin
 
 echo "setup secondary endpoint server..."
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$SECONDARY_ENDPOINT_SERVER_IP <<EOF
-    sudo apt update
-    sudo apt install python3-flask -y
-    python3 endpoint.py $REDIS_SERVER_IP secondary
+    sudo apt-get update
+    sudo apt-get install python3-flask -y
+    sudo apt-get install python3-pip -y
+    pip3 install redis
+    pip3 install apscheduler
+    pip3 install boto3
+    nohup python3 endpoint.py $REDIS_SERVER_IP secondary $ACCESS_KEY_ID $SECRET_ACCESS_KEY &>/dev/null &
     exit
 EOF
 
@@ -171,14 +171,14 @@ aws ec2 authorize-security-group-ingress        \
 
 echo '#!/bin/bash' > userdata
 echo 'cd /root' >> userdata
-echo 'REDIS_SERVER_IP='$REDIS_SERVER_IP >> userdata
 echo 'sudo apt-get update' >> userdata
 echo 'sudo apt-get install -y python3-pip' >> userdata
 echo 'sudo apt-get install -y git-all' >> userdata
 echo 'pip3 install redis' >> userdata
 echo 'git clone "https://github.com/salasin/IDC-CloudComputing"' >> userdata
-echo 'python3 IDC-CloudComputing/HW2/worker.py $REDIS_SERVER_IP' >> userdata
+echo 'python3 IDC-CloudComputing/HW2/worker.py '$REDIS_SERVER_IP >> userdata
 
+echo "creating launch configuration for worker nodes..."
 aws autoscaling create-launch-configuration \
     --launch-configuration-name worker-lc \
     --image-id $UBUNTU_20_04_AMI \
@@ -189,17 +189,13 @@ aws autoscaling create-launch-configuration \
 
 rm userdata
 
-#VPC=$(aws ec2 describe-security-groups --group-names $WORKER_SERVER_SEC_GRP |
-#    jq -r '.SecurityGroups[0].VpcId'
-#)
-
-# TODO: determine $AVAILABILITY_ZONE dynamically
-
+echo "creating auto scaling group for worker nodes..."
 aws autoscaling create-auto-scaling-group --auto-scaling-group-name workers-asg \
   --launch-configuration-name worker-lc \
   --availability-zones $AVAILABILITY_ZONE \
   --max-size 1 --min-size 0
 
+echo "creating auto scaling policies for worker nodes..."
 START_POLICY_ARN=$(aws autoscaling put-scaling-policy --policy-name start-worker-policy \
   --auto-scaling-group-name workers-asg --scaling-adjustment 1 \
   --adjustment-type ChangeInCapacity | jq -r '.PolicyARN'
@@ -210,6 +206,7 @@ STOP_POLICY_ARN=$(aws autoscaling put-scaling-policy --policy-name stop-worker-p
   --adjustment-type ChangeInCapacity --cooldown 300 | jq -r '.PolicyARN'
 )
 
+echo "creating cloudwatch alarms and connecting them to the auto scaling policies of the worker nodes..."
 aws cloudwatch put-metric-alarm --alarm-name start-worker-alarm \
   --metric-name work_queue_length --namespace CloudComputingHW2 --statistic Average \
   --period 60 --evaluation-periods 5 --threshold 0.001 \

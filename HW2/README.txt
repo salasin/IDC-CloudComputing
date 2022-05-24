@@ -1,0 +1,1 @@
+Do not forget to populate the keys in deploy.sh before running the stack.
