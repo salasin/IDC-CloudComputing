@@ -27,9 +27,12 @@ aws ec2 create-security-group   \
     --group-name $REDIS_SEC_GRP       \
     --description "Redis server security group"
 
-echo "setup rule allowing SSH access to Redis server..."
 aws ec2 authorize-security-group-ingress        \
     --group-name $REDIS_SEC_GRP --port 22 --protocol tcp \
+    --cidr $MY_IP/32
+
+aws ec2 authorize-security-group-ingress        \
+    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
     --cidr $MY_IP/32
 
 echo "creating Redis server..."
@@ -71,12 +74,10 @@ aws ec2 create-security-group   \
     --group-name $ENDPOINT_SERVER_SEC_GRP      \
     --description "Endpoint server security group"
 
-echo "setup rule allowing SSH access to endpoint servers"
 aws ec2 authorize-security-group-ingress        \
     --group-name $ENDPOINT_SERVER_SEC_GRP --port 22 --protocol tcp \
     --cidr $MY_IP/32
 
-echo "setup rule allowing HTTP access to endpoint server"
 aws ec2 authorize-security-group-ingress        \
     --group-name $ENDPOINT_SERVER_SEC_GRP --port 5000 --protocol tcp \
     --cidr $MY_IP/32
@@ -169,7 +170,6 @@ aws ec2 create-security-group   \
     --group-name $WORKER_SERVER_SEC_GRP      \
     --description "Worker server security group"
 
-echo "setup rule allowing SSH access to worker servers"
 aws ec2 authorize-security-group-ingress        \
     --group-name $WORKER_SERVER_SEC_GRP --port 22 --protocol tcp \
     --cidr $MY_IP/32
