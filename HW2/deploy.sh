@@ -33,7 +33,7 @@ aws ec2 authorize-security-group-ingress        \
 
 aws ec2 authorize-security-group-ingress        \
     --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
-    --cidr $MY_IP/32
+    --cidr 0.0.0.0/0
 
 echo "creating Redis server..."
 RUN_REDIS_SERVER=$(aws ec2 run-instances   \
@@ -98,11 +98,6 @@ PRIMARY_ENDPOINT_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $PRIMARY
     jq -r '.Reservations[0].Instances[0].PublicIpAddress'
 )
 
-echo "setup rule allowing HTTP access to Redis server from primary endpoint server..."
-aws ec2 authorize-security-group-ingress        \
-    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
-    --cidr $PRIMARY_ENDPOINT_SERVER_IP/32
-
 echo "primary endpoint server $PRIMARY_ENDPOINT_SERVER_INSTANCE_ID @ $PRIMARY_ENDPOINT_SERVER_IP"
 
 echo "deploying code to primary endpoint server"
@@ -135,11 +130,6 @@ aws ec2 wait instance-running --instance-ids $SECONDARY_ENDPOINT_SERVER_INSTANCE
 SECONDARY_ENDPOINT_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $SECONDARY_ENDPOINT_SERVER_INSTANCE_ID |
     jq -r '.Reservations[0].Instances[0].PublicIpAddress'
 )
-
-echo "setup rule allowing HTTP access to Redis server from secondary endpoint server..."
-aws ec2 authorize-security-group-ingress        \
-    --group-name $REDIS_SEC_GRP --port 6379 --protocol tcp \
-    --cidr $SECONDARY_ENDPOINT_SERVER_IP/32
 
 echo "secondary endpoint server $SECONDARY_ENDPOINT_SERVER_INSTANCE_ID @ $SECONDARY_ENDPOINT_SERVER_IP"
 
