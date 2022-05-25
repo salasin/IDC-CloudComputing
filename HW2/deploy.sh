@@ -53,7 +53,7 @@ REDIS_SERVER_IP=$(aws ec2 describe-instances  --instance-ids $REDIS_SERVER_INSTA
 echo "Redis server $REDIS_SERVER_INSTANCE_ID @ $REDIS_SERVER_IP"
 
 echo "setup Redis server..."
-# This command may be flaky. It works every time when doing ssh manually but occasionally fails when run from a script.
+# This command may be flaky.
 ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$REDIS_SERVER_IP <<EOF
     sudo apt-get update
     sudo apt-get install redis-server -y
