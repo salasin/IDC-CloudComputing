@@ -37,7 +37,7 @@ def execute_pull_completed():
     top_arg = request.args.get('top')
     top = int(re.findall('\d+', top_arg)[0])
     redis_conn = get_redis_conn(app.config.get('redis_server_ip'))
-    # TODO: change this to be atomic
+    # The default redis version does not support atomic pop operation of multiple items.
     completed_work = []
     for i in range(top):
         item = redis_conn.lpop(COMPLETED_WORK_QUEUE)
